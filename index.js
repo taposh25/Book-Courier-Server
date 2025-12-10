@@ -30,6 +30,7 @@ const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster
 
             const db = client.db('book_courier_db');
             const booksCollection = db.collection('books');
+            const ordersCollection = db.collection('orders');
 
             // books API
 
@@ -43,7 +44,33 @@ const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster
             res.send(result);
         })
 
-            app.post('/books', async(req, res)=>{
+        //   app.get('/books/:id', async (req, res) => {
+        //   const id = req.params.id;
+        //   const query = { _id: new ObjectId(id) };
+        //   const result = await booksCollection.findOne(query);
+        //   res.send(result);
+        // });
+
+
+            app.get('/books/:id', async (req, res) => {
+            const id = req.params.id;
+            console.log("Requested ID:", id);
+
+            try {
+              const query = { _id: new ObjectId(id) };
+              const result = await booksCollection.findOne(query);
+              console.log("Mongo Result:", result);
+
+              res.send(result || {});
+            } catch (err) {
+              console.error(err);
+              res.status(400).send({ error: "Invalid ID" });
+            }
+          });
+
+
+
+          app.post('/books', async(req, res)=>{
           const book = req.body;
           book.createdAt = new Date()   
            // Check for duplicate by title (or title + author)
@@ -70,6 +97,45 @@ const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster
           res.send({ success: false, message: "Book not found" });
         }
       });
+
+      {/*Orders related API*/}
+
+      // create order
+        app.post('/orders', async (req, res) => {
+          try {
+            const order = req.body;
+
+            // basic server-side validation (adjust as needed)
+            if (!order.bookId || !order.userEmail || !order.name || !order.phone || !order.address) {
+              return res.status(400).send({ error: 'Missing required order fields' });
+            }
+
+            // add server controlled fields
+            order.status = 'pending';           // order workflow status
+            order.paymentStatus = 'unpaid';     // payment state
+            order.createdAt = new Date();
+
+            const result = await ordersCollection.insertOne(order);
+            res.send(result);
+          } catch (err) {
+            console.error('POST /orders error', err);
+            res.status(500).send({ error: 'Server error' });
+          }
+        });
+
+        // optional: get all orders (admin) or filter by user email
+        app.get('/orders', async (req, res) => {
+          try {
+            const { email } = req.query; // optional ?email=user@example.com
+            const query = email ? { userEmail: email } : {};
+            const orders = await ordersCollection.find(query).sort({ createdAt: -1 }).toArray();
+            res.send(orders);
+          } catch (err) {
+            console.error('GET /orders error', err);
+            res.status(500).send({ error: 'Server error' });
+          }
+        });
+
 
 
 
