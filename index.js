@@ -137,6 +137,27 @@ const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster
         });
 
 
+      app.delete('/orders/:id', async (req, res) => {
+        try {
+          const id = req.params.id;
+
+          const query = { _id: new ObjectId(id) };
+          const result = await ordersCollection.deleteOne(query);
+
+          if (result.deletedCount > 0) {
+            res.send({ success: true, message: "Order deleted successfully" });
+          } else {
+            res.send({ success: false, message: "Order not found" });
+          }
+
+        } catch (err) {
+          console.error("DELETE /orders/:id error", err);
+          res.status(500).send({ error: "Server error" });
+        }
+      });
+
+
+
 
 
 
