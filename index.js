@@ -138,12 +138,14 @@ const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster
         });
 
 
-
+      // Specific order ID 
         app.get('/orders/:id', async(req, res)=>{
           const id = req.params.id;
           const query = { _id: new ObjectId(id) };
           const result = await ordersCollection.findOne(query);
+          // console.log(result)
           res.send(result);
+          
 
         })
        
@@ -166,89 +168,6 @@ const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster
           res.status(500).send({ error: "Server error" });
         }
       });
-
-
-
-      
-    // // Stripe Payment
-      // app.post('/create-payment-intent', async (req, res) => {
-      //   const { orderId, amount } = req.body;
-
-      //   try {
-
-      //     const priceInUSD = Math.round((amount / 120) * 100); // BDT → USD cents
-
-      //     const session = await stripe.checkout.sessions.create({
-      //       payment_method_types: ['card'],
-      //       line_items: [
-      //         {
-      //           price_data: {
-      //             currency: 'usd',
-      //             product_data: { name: "Book Order" },
-      //             unit_amount: priceInUSD,
-      //           },
-      //           quantity: 1,
-      //         },
-      //       ],
-      //       mode: 'payment',
-      //       success_url: `${process.env.SITE_DOMAIN}/dashboard/payment-success?orderId=${orderId}`,
-      //       cancel_url: `${process.env.SITE_DOMAIN}/dashboard/payment-cancelled?orderId=${orderId}`,
-      //     });
-
-      //     res.send({ url: session.url });
-
-      //   } catch (err) {
-      //     console.error(err);
-      //     res.status(500).send({ error: "Stripe payment failed" });
-      //   }
-      // });
-
-       // Stripe Checkout Session for Book Orders
-app.post("/create-payment-intent", async (req, res) => {
-  try {
-    const { orderId, amount, bookTitle, userEmail } = req.body;
-
-    // Convert BDT → USD → CENTS
-        const usd = amount / 120; 
-        const cents = Math.round(usd * 100);
-
-        const session = await stripe.checkout.sessions.create({
-          payment_method_types: ["card"],
-          line_items: [
-            {
-              price_data: {
-                currency: "usd",
-                unit_amount: cents,
-                product_data: {
-                  name: `Payment for: ${bookTitle}`,
-                },
-              },
-              quantity: 1,
-            },
-          ],
-          mode: "payment",
-
-          metadata: {
-            orderId: orderId,
-            bookTitle: bookTitle,
-          },
-
-          customer_email: userEmail,
-
-          success_url: `${process.env.SITE_DOMAIN}/dashboard/my-orders-success`,
-          cancel_url: `${process.env.SITE_DOMAIN}/dashboard/my-orders-cancelled`,
-        });
-
-        console.log("Checkout Session URL:", session.url);
-
-        res.send({ url: session.url });
-
-      } catch (error) {
-        console.error("Stripe Error:", error);
-        res.status(500).send({ error: "Stripe Session Failed" });
-      }
-    });
-
 
 
 
@@ -280,6 +199,38 @@ app.post("/create-payment-intent", async (req, res) => {
         }
         run().catch(console.dir);
 
+        //Stripe-Checkout-Session for payment
+
+   app.post('/create-checkout-session', async (req, res) =>{
+           const paymentInfo = req.body;
+           console.log(paymentInfo)
+           const amount = parseInt(paymentInfo.price) * 100;
+           const session = await stripe.checkout.sessions.create({
+                line_items: [
+            {
+            
+              price_data: {
+                currency: 'USD',
+                unit_amount: amount,
+                product_data:{
+                  name:paymentInfo.bookTitle
+                } 
+              },
+              quantity: 1,
+            },
+          ],
+          customer_email: paymentInfo.userEmail,
+          mode: 'payment',
+          metadata: {
+            orderId: paymentInfo.orderId
+          },
+          success_url: `${process.env.SITE_DOMAIN}/dashboard/payment-success`,
+          cancel_url: `${process.env.SITE_DOMAIN}/dashboard/payment-cancelled`,
+
+           })
+           console.log(session)
+           res.send({ url: session.url})
+    })
 
 
 
