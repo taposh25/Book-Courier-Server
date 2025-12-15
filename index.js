@@ -83,7 +83,7 @@ const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster
             res.send(result);
           })
 
-         app.patch("/users/:id/role",verifyFBToken,verifyAdmin, async(req, res)=>{
+         app.patch("/users/:id/role", async(req, res)=>{
           const id = req.params.id;
           const roleInfo = req.body;
           const query = {_id: new ObjectId(id) };
@@ -221,6 +221,30 @@ const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster
             const result = await cursor.toArray();
             res.send(result);
         })
+
+        // Search book from database
+
+            app.get('/books', async (req, res) => {
+          const search = req.query.search;
+
+          let query = {};
+
+          if (search) {
+            query = {
+              title: { $regex: search, $options: 'i' } 
+            };
+          }
+
+          const result = await booksCollection.find(query).toArray();
+          res.send(result);
+        });
+
+
+      
+
+
+    
+
 
 
 
