@@ -11,7 +11,7 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET);
 app.use(express.json());
 app.use(cors());
 
-
+// Token verify
     const verifyFBToken = async (req, res, next) => {
         const token = req.headers.authorization;
 
@@ -60,6 +60,22 @@ const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster
 
 
 
+            // middlewear with database access
+
+            const verifyAdmin = async (req, res, next) => {
+            const email = req.decoded_email;
+            const query = { email };
+            const user = await usersCollection.findOne(query);
+
+            if (!user || user.role !== 'admin') {
+                return res.status(403).send({ message: 'forbidden access' });
+            }
+
+            next();
+        }
+
+
+
           // Users Related APIs
           app.get("/users", async(req, res)=>{
             const cursor  = usersCollection.find();
@@ -67,7 +83,7 @@ const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster
             res.send(result);
           })
 
-         app.patch("/users/:id", async(req, res)=>{
+         app.patch("/users/:id/role",verifyFBToken,verifyAdmin, async(req, res)=>{
           const id = req.params.id;
           const roleInfo = req.body;
           const query = {_id: new ObjectId(id) };
@@ -134,7 +150,7 @@ const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster
           })
 
 
-          app.patch('/riders/:id', async (req, res) => {
+          app.patch('/riders/:id',verifyFBToken, verifyAdmin, async (req, res) => {
             const status = req.body.status;
             const id = req.params.id;
             const query = { _id: new ObjectId(id) }
