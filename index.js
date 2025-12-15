@@ -12,6 +12,28 @@ app.use(express.json());
 app.use(cors());
 
 
+    const verifyFBToken = async (req, res, next) => {
+        const token = req.headers.authorization;
+
+        if (!token) {
+            return res.status(401).send({ message: 'unauthorized access' })
+        }
+
+        try {
+            const idToken = token.split(' ')[1];
+            const decoded = await admin.auth().verifyIdToken(idToken);
+            console.log('decoded in the token', decoded);
+            req.decoded_email = decoded.email;
+            next();
+        }
+        catch (err) {
+            return res.status(401).send({ message: 'unauthorized access' })
+        }
+
+
+    }
+
+
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.aa4hy5v.mongodb.net/?appName=Cluster0`;
 
 
@@ -33,9 +55,147 @@ const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster
             const db = client.db('book_courier_db');
             const booksCollection = db.collection('books');
             const ordersCollection = db.collection('orders');
+            const usersCollection = db.collection('users');
+            const ridersCollection = db.collection('riders');
+
+
+
+          // Users Related APIs
+          app.get("/users", async(req, res)=>{
+            const cursor  = usersCollection.find();
+            const result = await cursor.toArray();
+            res.send(result);
+          })
+
+         app.patch("/users/:id", async(req, res)=>{
+          const id = req.params.id;
+          const roleInfo = req.body;
+          const query = {_id: new ObjectId(id) };
+          const updatedDoc = {
+                $set: {
+                  role: roleInfo.role
+                }
+          }
+          const result = await usersCollection.updateOne(query, updatedDoc);
+          res.send(result);
+
+
+         })
+
+          app.post('/users', async (req, res) => {
+          const user = req.body;
+          const email = user.email;
+
+          //  Step 1: check user exists
+          const userExists = await usersCollection.findOne({ email });
+
+          if (userExists) {
+            return res.send({ message: 'user exists' });
+          }
+
+          //  Step 2: insert only if not exists
+          user.role = 'user';
+          user.createdAt = new Date();
+
+          const result = await usersCollection.insertOne(user);
+          res.send(result);
+        });
+
+        // Get Users Role 
+
+          app.get('/users/:email/role', async (req, res) => {
+            const email = req.params.email;
+            const query = { email }
+            const user = await usersCollection.findOne(query);
+            res.send({ role: user?.role || 'user' })
+        })
+
+
+
+          // Rider Related APIs
+
+          app.post("/riders", async(req, res)=>{
+          const rider = req.body;
+          rider.status = 'pending';
+          rider.createdAt = new Date();
+
+          const result =  await ridersCollection.insertOne(rider);
+          res.send(result);
+          })
+
+          app.get("/riders", async(req, res)=>{
+            const query = {}
+            if(req.query.status){
+              query.status = req.query.status;
+            }
+            const cursor = ridersCollection.find(query)
+            const result = await cursor.toArray();
+            res.send(result);
+          })
+
+
+          app.patch('/riders/:id', async (req, res) => {
+            const status = req.body.status;
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) }
+            const updatedDoc = {
+                $set: {
+                    status: status
+                }
+            }
+
+            const result = await ridersCollection.updateOne(query, updatedDoc);
+            if (status === 'approved') {
+                const email = req.body.email;
+                const userQuery = { email }
+                const updateUser = {
+                    $set: {
+                        role: 'rider'
+                    }
+                }
+                const userResult = await usersCollection.updateOne(userQuery, updateUser);
+            }
+
+            res.send(result);
+
+            
+          }
+          )
+
+
+          app.delete('/riders/:id', async (req, res) => {
+          const id = req.params.id;
+          const query = { _id: new ObjectId(id) };
+
+          const result = await ridersCollection.deleteOne(query);
+          res.send(result);
+        });
+
+
+          // users related apis
+
+           app.post('/users', async (req, res) => {
+          const user = req.body;
+          const email = user.email;
+
+          //  Step 1: check user exists
+          const userExists = await usersCollection.findOne({ email });
+
+          if (userExists) {
+            return res.send({ message: 'user exists' });
+          }
+
+          //  Step 2: insert only if not exists
+          user.role = 'user';
+          user.createdAt = new Date();
+
+          const result = await usersCollection.insertOne(user);
+          res.send(result);
+        });
+
 
             // books API
-
+         
            app.get('/books', async (req, res) => {
             const query = {}
       
@@ -46,12 +206,6 @@ const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster
             res.send(result);
         })
 
-        //   app.get('/books/:id', async (req, res) => {
-        //   const id = req.params.id;
-        //   const query = { _id: new ObjectId(id) };
-        //   const result = await booksCollection.findOne(query);
-        //   res.send(result);
-        // });
 
 
             app.get('/books/:id', async (req, res) => {
@@ -129,6 +283,7 @@ const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster
           try {
             const { email } = req.query; 
             const query = email ? { userEmail: email } : {};
+            console.log('headers',req.headers);
             const orders = await ordersCollection.find(query).sort({ createdAt: -1 }).toArray();
             res.send(orders);
           } catch (err) {
@@ -171,21 +326,49 @@ const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster
 
 
 
-          app.patch("/orders/:id/confirm", async (req, res) => {
-        try {
-          const id = req.params.id;
+      //   app.patch("/orders/:id/confirm", async (req, res) => {
+      //   try {
+      //     const id = req.params.id;
 
-          const result = await ordersCollection.updateOne(
-            { _id: new ObjectId(id) },
-            { $set: { status: "confirmed", paymentStatus: "paid" } }
-          );
+      //     const result = await ordersCollection.updateOne(
+      //       { _id: new ObjectId(id) },
+      //       { $set: { status: "confirmed", paymentStatus: "paid" } }
+      //     );
 
-          res.send({ success: true, result });
+      //     res.send({ success: true, result });
 
-        } catch (error) {
-          res.status(500).send({ error: "Failed to update payment status" });
-        }
-      });
+      //   } catch (error) {
+      //     res.status(500).send({ error: "Failed to update payment status" });
+      //   }
+      // });
+
+
+           app.patch("/orders/:id/confirm", async (req, res) => {
+          try {
+            const id = req.params.id;
+
+            const result = await ordersCollection.updateOne(
+              { _id: new ObjectId(id) },
+              {
+                $set: {
+                  status: "paid",
+                  paymentStatus: "paid",
+                  paidAt: new Date()
+                }
+              }
+            );
+
+            if (result.matchedCount === 0) {
+              return res.status(404).send({ success: false, message: "Order not found" });
+            }
+
+            res.send({ success: true });
+
+          } catch (error) {
+            res.status(500).send({ success: false, message: "Failed to update payment status" });
+          }
+        });
+
 
 
 
