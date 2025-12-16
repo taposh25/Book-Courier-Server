@@ -11,7 +11,7 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET);
 app.use(express.json());
 app.use(cors());
 
-// Token verify
+//Firebase Token verify
     const verifyFBToken = async (req, res, next) => {
         const token = req.headers.authorization;
 
@@ -60,7 +60,7 @@ const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster
 
 
 
-            // middlewear with database access
+            //Admin middlewear with database access
 
             const verifyAdmin = async (req, res, next) => {
             const email = req.decoded_email;
@@ -102,14 +102,14 @@ const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster
           const user = req.body;
           const email = user.email;
 
-          //  Step 1: check user exists
+          //  check user exists
           const userExists = await usersCollection.findOne({ email });
 
           if (userExists) {
             return res.send({ message: 'user exists' });
           }
 
-          //  Step 2: insert only if not exists
+          //  insert only if not exists
           user.role = 'user';
           user.createdAt = new Date();
 
@@ -194,14 +194,14 @@ const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster
           const user = req.body;
           const email = user.email;
 
-          //  Step 1: check user exists
+          //  check user exists
           const userExists = await usersCollection.findOne({ email });
 
           if (userExists) {
             return res.send({ message: 'user exists' });
           }
 
-          //  Step 2: insert only if not exists
+          //  insert only if not exists
           user.role = 'user';
           user.createdAt = new Date();
 
@@ -241,12 +241,6 @@ const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster
 
 
       
-
-
-    
-
-
-
 
             app.get('/books/:id', async (req, res) => {
             const id = req.params.id;
@@ -305,7 +299,7 @@ const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster
               return res.status(400).send({ error: 'Missing required order fields' });
             }
 
-            // add server controlled fields
+          
             order.status = 'pending';           
             order.paymentStatus = 'unpaid';     
             order.createdAt = new Date();
@@ -318,7 +312,6 @@ const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster
           }
         });
 
-        // optional: get all orders (admin) or filter by user email
         app.get('/orders', async (req, res) => {
           try {
             const { email } = req.query; 
@@ -363,24 +356,6 @@ const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster
           res.status(500).send({ error: "Server error" });
         }
       });
-
-
-
-      //   app.patch("/orders/:id/confirm", async (req, res) => {
-      //   try {
-      //     const id = req.params.id;
-
-      //     const result = await ordersCollection.updateOne(
-      //       { _id: new ObjectId(id) },
-      //       { $set: { status: "confirmed", paymentStatus: "paid" } }
-      //     );
-
-      //     res.send({ success: true, result });
-
-      //   } catch (error) {
-      //     res.status(500).send({ error: "Failed to update payment status" });
-      //   }
-      // });
 
 
            app.patch("/orders/:id/confirm", async (req, res) => {
